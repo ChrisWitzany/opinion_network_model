@@ -12,6 +12,7 @@ import matplotlib as plt
 class GraphType(enum.IntEnum):
   CAVEMAN = 0
   GAUSSIAN_RANDOM_PARTITION = 1
+  WINDMILL = 2
 
 
 # --- DEFAULT ---
@@ -70,7 +71,7 @@ def gen_gaussian_random_partition(n: int, s: float, v: float, p_in: float, p_out
   :param s: mean cluster size
   :param v: shape parameter, the variance of cluster size distribution is s/v
   :param p_in: probabilty of intra cluster connection
-  :param p_out: probabilty of inter cluster connection.
+  :param p_out: probabilty of inter cluster connection
 
   :return: Gaussian Random Partition Graph of n nodes with specified parameters
   """
@@ -80,7 +81,7 @@ def gen_gaussian_random_partition(n: int, s: float, v: float, p_in: float, p_out
 
 def visualize_gaussian_random_partition(graph: nx.Graph):
   """
-  Visualize Gaussian Random Partition Graph, uses nx.draw_circularß(G)
+  Visualize Gaussian Random Partition Graph, uses nx.draw_circular(G)
 
   :param graph: input graph
   """
@@ -88,14 +89,41 @@ def visualize_gaussian_random_partition(graph: nx.Graph):
   nx.draw_circular(graph)
 
 
+# --- WINDMILL ---
+def gen_windmill(n: int, k: int) -> nx.Graph:
+  """
+  Generates Windmill Graph as specified in:
+  https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.windmill_graph.html#networkx.generators.community.windmill_graph
+
+  :param n: number of cliques
+  :param k: size of cliques
+
+  :return: Windmill Graph of n cliques each of size k
+  """
+
+  return nx.windmill_graph(n, k)
+
+
+def visualize_windmill(graph: nx.Graph):
+  """
+  Visualize Windmill Graph, uses nx.draw_spring(G)
+
+  :param graph: input graph
+  """
+
+  nx.draw_spring(graph)
+
+
 # --- Wrapper Methods ---
 generators = defaultdict(gen_default)
 generators[GraphType.CAVEMAN] = gen_caveman
 generators[GraphType.GAUSSIAN_RANDOM_PARTITION] = gen_gaussian_random_partition
+generators[GraphType.WINDMILL] = gen_windmill
 
 visualizers = defaultdict(visualize_default)
 visualizers[GraphType.CAVEMAN] = visualize_caveman
 visualizers[GraphType.GAUSSIAN_RANDOM_PARTITION] = visualize_gaussian_random_partition
+visualizers[GraphType.WINDMILL] = visualize_windmill
 
 
 def generate(graph_type: GraphType, params: Tuple) -> nx.Graph:
