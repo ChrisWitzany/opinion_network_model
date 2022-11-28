@@ -13,6 +13,7 @@ class GraphType(enum.IntEnum):
   CAVEMAN = 0
   GAUSSIAN_RANDOM_PARTITION = 1
   WINDMILL = 2
+  SMALLWORLD = 3
 
 
 # --- DEFAULT ---
@@ -114,16 +115,44 @@ def visualize_windmill(graph: nx.Graph):
   nx.draw_spring(graph)
 
 
+# --- SMALLWORLD ---
+def gen_smallworld(n: int, k: int, p: float) -> nx.Graph:
+  """
+  Generates Newman–Watts–Strogatz small-world Graph as specified in:
+  https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.newman_watts_strogatz_graph.html#networkx.generators.random_graphs.newman_watts_strogatz_graph
+
+  :param n: number of nodes
+  :param k: each node is joined with its k nearest neighbors in a ring topology
+  :param p: probability of adding a new edge for each edge
+
+  :return: Newman–Watts–Strogatz small-world Graph of n nodes with specified parameters
+  """
+
+  return nx.newman_watts_strogatz_graph(n, k, p)
+
+
+def visualize_smallworld(graph: nx.Graph):
+  """
+  Visualize Newman–Watts–Strogatz small-world Graph, uses nx.draw_spring(G)
+
+  :param graph: input graph
+  """
+
+  nx.draw_circular(graph)
+
+
 # --- Wrapper Methods ---
 generators = defaultdict(gen_default)
 generators[GraphType.CAVEMAN] = gen_caveman
 generators[GraphType.GAUSSIAN_RANDOM_PARTITION] = gen_gaussian_random_partition
 generators[GraphType.WINDMILL] = gen_windmill
+generators[GraphType.SMALLWORLD] = gen_smallworld
 
 visualizers = defaultdict(visualize_default)
 visualizers[GraphType.CAVEMAN] = visualize_caveman
 visualizers[GraphType.GAUSSIAN_RANDOM_PARTITION] = visualize_gaussian_random_partition
 visualizers[GraphType.WINDMILL] = visualize_windmill
+visualizers[GraphType.SMALLWORLD] = visualize_smallworld
 
 
 def generate(graph_type: GraphType, params: Tuple) -> nx.Graph:
