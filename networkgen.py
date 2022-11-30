@@ -147,6 +147,7 @@ class SmallWorldNetwork(DefaultNetwork):
 
 
 class NetworkType(enum.IntEnum):
+  DEFAULT = -1
   CAVEMAN = 0
   GAUSSIAN_RANDOM_PARTITION = 1
   WINDMILL = 2
