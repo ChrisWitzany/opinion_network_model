@@ -1,6 +1,7 @@
 import time
 import enum
 import math
+import random
 from collections import defaultdict
 from typing import Tuple, Any, DefaultDict, Callable, Union
 
@@ -138,12 +139,76 @@ class SmallWorldNetwork(DefaultNetwork):
   @staticmethod
   def visualize(graph: nx.Graph):
     """
-    Visualize Newman–Watts–Strogatz small-world Graph, uses nx.draw_spring(G)
+    Visualize Newman–Watts–Strogatz small-world Graph, uses nx.draw_circular(G)
 
     :param graph: input graph
     """
 
     nx.draw_circular(graph)
+
+
+# --- ERDOS_RENYI ---
+class ErdosRenyiNetwork(DefaultNetwork):
+  @staticmethod
+  def generate(n: int, p: float) -> nx.Graph:
+    """
+    Generates Erdos-Renyi Graph as specified in:
+    https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.erdos_renyi_graph.html#networkx.generators.random_graphs.erdos_renyi_graph
+
+    :param n: number of nodes
+    :param p: probability of edge creation
+
+    :return: Erdos-Renyi Graph of n nodes with specified parameters
+    """
+
+    return nx.erdos_renyi_graph(n, p)
+
+  @staticmethod
+  def visualize(graph: nx.Graph):
+    """
+    Visualize Erdos-Renyi Graph, uses nx.draw_spring(G)
+
+    :param graph: input graph
+    """
+
+    nx.draw_spring(graph)
+
+
+# --- RELAXED_CAVEMAN ---
+class RelaxedCavemanNetwork(DefaultNetwork):
+  @staticmethod
+  def generate(l: int, k: int, p: float, f: float) -> nx.Graph:
+    """
+    Generates Relaxed Caveman Graph as specified in:
+    https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.relaxed_caveman_graph.html
+
+    While randomly adding edges
+
+    :param l: number of cliques
+    :param k: size of cliques
+    :param p: probability of rewiring each edge
+    :param f: fraction of edges that are not in the original graph to be sampled
+
+    :return: Connected Caveman Graph of l cliques each of size k
+    """
+
+    G = nx.relaxed_caveman_graph(l, k, p)
+    non_edges = list(nx.non_edges(G))
+
+    new_edges = random.sample(non_edges, int(f * len(non_edges)))
+    G.add_edges_from(new_edges)
+
+    return G
+
+  @staticmethod
+  def visualize(graph: nx.Graph):
+    """
+    Visualize Relaxed Caveman Graph, uses nx.draw_kamada_kawai(G)
+
+    :param graph: input graph
+    """
+
+    nx.draw_kamada_kawai(graph)
 
 
 class NetworkType(enum.IntEnum):
@@ -152,6 +217,8 @@ class NetworkType(enum.IntEnum):
   GAUSSIAN_RANDOM_PARTITION = 1
   WINDMILL = 2
   SMALLWORLD = 3
+  ERDOS_RENYI = 4
+  RELAXED_CAVEMAN = 5
 
 
 class Network:
@@ -162,6 +229,8 @@ class Network:
     networks[NetworkType.GAUSSIAN_RANDOM_PARTITION] = GaussianRandomPartitionNetwork
     networks[NetworkType.WINDMILL] = WindmillNetwork
     networks[NetworkType.SMALLWORLD] = SmallWorldNetwork
+    networks[NetworkType.ERDOS_RENYI] = ErdosRenyiNetwork
+    networks[NetworkType.RELAXED_CAVEMAN] = RelaxedCavemanNetwork
 
     return networks[network_type]
 
@@ -188,12 +257,3 @@ class Network:
     """
 
     Network.network_by_type(network_type).visualize(graph)
-  
-  @staticmethod
-  def network_attributes(graph: nx.Graph):
-    """
-    Returns the number of nodes in a graph
-
-    :param graph: input graph
-    """
-    return graph.nodes.size()
