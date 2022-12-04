@@ -78,7 +78,7 @@ class OpinionAgent(Agent):
     self.state = np.clip(np.random.normal(self.state, 0.1), 0, 1)  # TODO: make hyperparameter
     self.update_neighbor_weights()
 
-    sampled_neighbors = random.sample(neighbors, 3)
+    sampled_neighbors = random.sample(neighbors, min(len(neighbors),3))
     accumulated_step = 0.0
     global_opinion = np.round(np.mean([agent.state for agent in self.model.grid.get_all_cell_contents()]))
     for neighbor_id in sampled_neighbors:
