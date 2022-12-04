@@ -210,6 +210,55 @@ class RelaxedCavemanNetwork(DefaultNetwork):
 
     nx.draw_kamada_kawai(graph)
 
+# --- STAR_CLIQUES ---
+class StarClique(DefaultNetwork):
+  @staticmethod
+  def generate(l: int, n: float, m: float) -> nx.Graph:
+    """
+    Generates a graph similar to the Relaxed Caveman Graph as specified in:
+    https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.relaxed_caveman_graph.html
+
+    where the cliques are Windmill graphs as specified in: 
+
+
+    :param l: number of windmill cliques
+    :param n: number of cliques in the windmill subgraphs
+    :param m: size of cliques in the windmill subgraphs 
+
+    :return: Connected Star Clique Graph of l cliques each of size k
+    """
+    #size of cliques in the main graph
+    k = n * m + 1
+
+    clique_list = []
+    for i in range(l):
+      clique_list.append(nx.windmill_graph(n, m))
+
+    #now need to connect the cliques of clique_list in a caveman fashion
+    G = nx.compose_all(clique_list)
+
+    caveman_nodes = []
+
+    for component in nx.connected_components(G):
+      caveman_nodes.append(component[random.randint(0, k)])
+    
+    for i in range(len(caveman_nodes)):
+      if i==len(caveman_nodes)-1:
+        G.add_edge(caveman_nodes[i], caveman_nodes[0])
+      else:
+        G.add_edge(caveman_nodes[i], caveman_nodes[i+1])
+
+    return G
+
+  @staticmethod
+  def visualize(graph: nx.Graph):
+    """
+    Visualize Star Clique Graph, uses nx.draw_kamada_kawai(G)
+
+    :param graph: input graph
+    """
+
+    nx.draw_kamada_kawai(graph)
 
 class NetworkType(enum.IntEnum):
   DEFAULT = -1
@@ -219,6 +268,7 @@ class NetworkType(enum.IntEnum):
   SMALLWORLD = 3
   ERDOS_RENYI = 4
   RELAXED_CAVEMAN = 5
+  STAR_CLIQUE = 6
 
 
 class Network:
@@ -231,6 +281,7 @@ class Network:
     networks[NetworkType.SMALLWORLD] = SmallWorldNetwork
     networks[NetworkType.ERDOS_RENYI] = ErdosRenyiNetwork
     networks[NetworkType.RELAXED_CAVEMAN] = RelaxedCavemanNetwork
+    networks[NetworkType.STAR_CLIQUE] = StarClique
 
     return networks[network_type]
 
