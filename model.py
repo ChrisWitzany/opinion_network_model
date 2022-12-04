@@ -34,6 +34,7 @@ class OpinionAgent(Agent):
     initial_opinion: Opinion  # TODO: docs
     prob_S_with_I: float  # TODO: docs
     prob_S_with_Z: float  # TODO: docs
+    neighbor_threshold: float = None  # TODO: docs
 
   def __init__(self,
       unique_id: int,
@@ -58,6 +59,32 @@ class OpinionAgent(Agent):
 
     # TODO: add docs explaining this
     neighbors = self.model.grid.get_neighbors(self.unique_id, include_center=False)
+
+    if len(neighbors) == 0:
+      return
+
+    if self.params.neighbor_threshold is not None:
+      if self.state == Opinion.SKEPTIC:
+        n_infected = 0
+        for neighbor_id in neighbors:
+          neighbor = self.model.schedule.agents[neighbor_id]
+          if neighbor.state == Opinion.INFECTED:
+            n_infected += 1
+        if n_infected > self.params.neighbor_threshold * len(neighbors):
+          self.state = Opinion.INFECTED
+          return
+
+      if self.state == Opinion.INFECTED:
+        n_skeptic = 0
+        for neighbor_id in neighbors:
+          neighbor = self.model.schedule.agents[neighbor_id]
+          if neighbor.state == Opinion.SKEPTIC:
+            n_skeptic += 1
+        if n_skeptic > self.params.neighbor_threshold * len(neighbors):
+          self.state = Opinion.SKEPTIC
+          return
+
+    # Normal transitions
 
     for neighbor_id in random.sample(neighbors, min(1, len(neighbors))):
       neighbor = self.model.schedule.agents[neighbor_id]
