@@ -93,10 +93,13 @@ class OpinionAgent(Agent):
         transition_I = bernoulli.rvs(self.params.prob_S_with_I)
         transition_Z = bernoulli.rvs(self.params.prob_S_with_Z)
 
-        if transition_I and not transition_Z:
+        neighbor_not_skeptic = neighbor.state != Opinion.SKEPTIC
+        neighbor_not_infected = neighbor.state != Opinion.INFECTED
+
+        if transition_I and not transition_Z and neighbor_not_skeptic:
           self.state = Opinion.INFECTED
 
-        if transition_Z and not transition_I:
+        if transition_Z and not transition_I and neighbor_not_infected:
           self.state = Opinion.SKEPTIC
 
       if (self.state, neighbor.state) == (Opinion.SUSCEPTIBLE, Opinion.INFECTED):

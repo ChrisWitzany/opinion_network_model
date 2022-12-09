@@ -240,7 +240,7 @@ class StarClique(DefaultNetwork):
     caveman_nodes = []
 
     for component in nx.connected_components(G):
-      caveman_nodes.append(component[random.randint(0, k)])
+      caveman_nodes.append(component.nodes[random.randint(0, k)])
     
     for i in range(len(caveman_nodes)):
       if i==len(caveman_nodes)-1:
