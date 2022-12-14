@@ -273,7 +273,7 @@ class NetworkType(enum.IntEnum):
 
 class Network:
   @staticmethod
-  def network_by_type(network_type: NetworkType) -> DefaultNetwork:
+  def network_by_type(network_type: NetworkType) -> type(DefaultNetwork):
     networks = defaultdict(DefaultNetwork)
     networks[NetworkType.CAVEMAN] = CavemanNetwork
     networks[NetworkType.GAUSSIAN_RANDOM_PARTITION] = GaussianRandomPartitionNetwork
