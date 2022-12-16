@@ -49,11 +49,18 @@ class BaseAgent(Agent):
 # --- Money Agent ---
 
 class MoneyAgent(Agent):
-  class Params(NamedTuple):
+  class Params():
+
     certainty: float
     influence: float
     money: int
     sentiment: float
+
+    def __init__(self, certainty: float, influence: float, money: int, sentiment: float) -> None:
+      self.certainty = certainty
+      self.influence = influence
+      self.money = money
+      self.sentiment = sentiment
 
   def __init__(self, unique_id: int, model: Model, initial_state, params: Params) -> None:
     super().__init__(unique_id, model)
@@ -61,6 +68,9 @@ class MoneyAgent(Agent):
     self.model = model
     self.state = initial_state
     self.params = params
+    self.params.certainty = np.random.normal(params.certainty/2, params.influence/4)
+    self.params.influence = np.random.normal(params.influence/2, params.influence/4)
+    self.params.sentiment = params.sentiment + math.pow(-1, random.randint(0,1)) * random.uniform(0, 0.2)
 
   
   def step(self):
@@ -124,24 +134,24 @@ class SEIZplusModel(Model):
       return
 
     if self.params.neighbor_threshold is not None:
-      if agent.state == SEIZplusStates.SKEPTIC:
+      if agent.state == SEIZMstates.SKEPTIC:
         n_infected = 0
         for neighbor_id in neighbors:
           neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZplusStates.INFECTED:
+          if neighbor.state == SEIZMstates.INFECTED:
             n_infected += 1
         if n_infected > self.params.neighbor_threshold * len(neighbors):
-          agent.state = SEIZplusStates.INFECTED
+          agent.state = SEIZMstates.INFECTED
           return
 
-      if agent.state == SEIZplusStates.INFECTED:
+      if agent.state == SEIZMstates.INFECTED:
         n_skeptic = 0
         for neighbor_id in neighbors:
           neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZplusStates.SKEPTIC:
+          if neighbor.state == SEIZMstates.SKEPTIC:
             n_skeptic += 1
         if n_skeptic > self.params.neighbor_threshold * len(neighbors):
-          agent.state = SEIZplusStates.SKEPTIC
+          agent.state = SEIZMstates.SKEPTIC
           return
 
     # Normal transitions
@@ -312,14 +322,14 @@ class SEIZMModel(Model):
 
             else:
               #small step in random direction
-              agent.params.sentiment += math.pow(-1, random.randint()) * random.uniform(0,1) * agent.params.certainty
+              agent.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * agent.params.certainty
 
 
 
         #CASE 1.3 - DONE
         if neighbor.state == SEIZMstates.INFECTED:
 
-          if neighbor.params.money >= 0 and neighbor.params.certainty > self.params.certainty_threshold and neighbor.params.influence > self.params.influence_threshold and random.uniform(0.1) > self.params.money_theshold:
+          if neighbor.params.money >= 0 and neighbor.params.certainty > self.params.certainty_threshold and neighbor.params.influence > self.params.influence_threshold and random.uniform(0,1) > self.params.money_theshold:
             #ask to spend money 
 
             if agent.params.sentiment > 0.5 and agent.params.influence < self.params.influence_threshold and agent.params.certainty > self.params.certainty_threshold:
@@ -367,7 +377,7 @@ class SEIZMModel(Model):
 
               else:
                 #small step in random direction
-                agent.params.sentiment += math.pow(-1, random.randint()) * random.uniform(0,1) * agent.params.certainty
+                agent.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * agent.params.certainty
 
 
 
@@ -441,7 +451,7 @@ class SEIZMModel(Model):
 
             else:
               #small step in random direction
-              neighbor.params.sentiment += math.pow(-1, random.randint()) * random.uniform(0,1) * neighbor.params.certainty
+              neighbor.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty
 
         #CASE 3.2 - DONE
         if neighbor.state == SEIZMstates.SUSCEPTIBLE:
@@ -492,7 +502,7 @@ class SEIZMModel(Model):
         #CASE 4.1 - DONE
         if neighbor.state == SEIZMstates.EXPOSED:
           
-          if agent.params.money >= 0 and agent.params.certainty > self.params.certainty_threshold and agent.params.influence > self.params.influence_threshold and random.uniform(0.1) > self.params.money_theshold:
+          if agent.params.money >= 0 and agent.params.certainty > self.params.certainty_threshold and agent.params.influence > self.params.influence_threshold and random.uniform(0,1) > self.params.money_theshold:
             #ask to spend money 
 
             if neighbor.params.sentiment > 0.5 and neighbor.params.influence < self.params.influence_threshold and neighbor.params.certainty > self.params.certainty_threshold:
@@ -540,7 +550,7 @@ class SEIZMModel(Model):
 
               else:
                 #small step in random direction
-                neighbor.params.sentiment += math.pow(-1, random.randint()) * random.uniform(0,1) * neighbor.params.certainty
+                neighbor.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty
 
 
 
