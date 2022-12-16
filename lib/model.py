@@ -16,7 +16,8 @@ from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 
 from networkgen import Network, NetworkType
-from modelgen import Model, ModelType
+from modelgen import Model
+ModelType = Model.ModelType
 
 
 class ModelWrapper:
