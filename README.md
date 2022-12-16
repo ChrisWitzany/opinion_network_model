@@ -12,7 +12,7 @@ You need Conda to easily setup the environment, such that you can run the code.
 $ conda env create -f environment.yml
 ```
 
-This will create a new Conda environment named 'op_spread', proceed by running:
+This will create a new Conda environment named **op_spread**, proceed by running:
 
 ```shell
 $ conda activate op_spread
