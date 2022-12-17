@@ -1,4 +1,4 @@
-# A compartmental model utilizing epidemiological derived techniques to quantify monetary incentives as a driver of Conspiracy theory spreading
+# Network topology and monetary incentives drive establishment of conspiracy theories
 
 #### Authors: [Jose Luis Ocana Pujol](https://github.com/clopujol), [Gent Serifi](https://github.com/gserifi), [Anja Sjöström](https://github.com/anjaella), [Chris Witzany](https://github.com/ChrisWitzany)
 

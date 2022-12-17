@@ -260,6 +260,37 @@ class StarClique(DefaultNetwork):
 
     nx.draw_kamada_kawai(graph)
 
+
+# --- BARABASI_ALBERT ---
+class BarabasiAlbertNetwork(DefaultNetwork):
+  @staticmethod
+  def generate(n: int, m1: int, m2: int, p: float) -> nx.Graph:
+    """
+    Generates Dual Barabasi-Albert Graph as specified in:
+    https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.dual_barabasi_albert_graph.html
+
+    :param n: number of nodes
+    :param m1: number of edges to link each new node to existing nodes with probability p
+    :param m2: number of edges to link each new node to existing nodes with probability 1-p
+    :param p: probability of attaching m1 edges (as opposed to m2 edges)
+
+
+    :return: Random graph using dual Barabási–Albert preferential attachment
+    """
+
+    return nx.dual_barabasi_albert_graph(n, m1, m2, p)
+
+  @staticmethod
+  def visualize(graph: nx.Graph):
+    """
+    Visualize Barabasi-Albert Graph, uses nx.draw_kamada_kawai(G)
+
+    :param graph: input graph
+    """
+
+    nx.draw_kamada_kawai(graph)
+
+
 class NetworkType(enum.IntEnum):
   DEFAULT = -1
   CAVEMAN = 0
@@ -269,6 +300,7 @@ class NetworkType(enum.IntEnum):
   ERDOS_RENYI = 4
   RELAXED_CAVEMAN = 5
   STAR_CLIQUE = 6
+  BARABASI_ALBERT = 7
 
 
 class Network:
@@ -282,6 +314,7 @@ class Network:
     networks[NetworkType.ERDOS_RENYI] = ErdosRenyiNetwork
     networks[NetworkType.RELAXED_CAVEMAN] = RelaxedCavemanNetwork
     networks[NetworkType.STAR_CLIQUE] = StarClique
+    networks[NetworkType.BARABASI_ALBERT] = BarabasiAlbertNetwork
 
     return networks[network_type]
 

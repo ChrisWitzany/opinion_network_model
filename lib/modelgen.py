@@ -46,8 +46,8 @@ class BaseAgent(Agent):
   def step(self):
     self.model.resolve(self)
 
-# --- Money Agent ---
 
+# --- Money Agent ---
 class MoneyAgent(Agent):
   class Params:
     certainty: float
@@ -76,6 +76,149 @@ class MoneyAgent(Agent):
   
   def step(self):
     self.model.resolve(self)
+
+
+# --- SIR ---
+class SIRStates(enum.IntEnum):
+  DEFAULT = 0
+  UNSURE = 0
+  DISAGREE = 1
+  BELIEVE = 2
+
+
+# TODO: docs
+class SIRModel(Model):
+  class Params(NamedTuple):
+    initial_infected: float
+    initial_disagree: float
+    p_opinion_change: float
+
+  def __init__(self, params: Params):
+    """
+    Implements the SIR Model
+    """
+
+    super().__init__()
+
+    self.params = params
+
+  def setup(self):
+    # Initialize initial believers/skeptics
+    n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
+    n_initial_disagree = math.floor(self.population_size * self.params.initial_disagree)
+
+    initial_biased: List[BaseAgent] = random.sample(self.schedule.agents, n_initial_believers + n_initial_disagree)
+
+    for i in range(n_initial_believers):
+      initial_biased[i].state = SIRStates.BELIEVE
+
+    for i in range(n_initial_believers, len(initial_biased)):
+      initial_biased[i].state = SIRStates.DISAGREE
+
+  def create_agent(self, unique_id: int, agent_params: BaseAgent.Params):
+    return BaseAgent(unique_id, self, SIRStates.DEFAULT, agent_params)
+
+  def resolve(self, agent: BaseAgent) -> None:
+    """
+    Resolves interaction between agents
+
+    :param agent: agent that is to update
+    """
+
+    neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
+
+    for neighbor_id in neighbors:
+      neighbor_agent = self.schedule.agents[neighbor_id]
+
+      if agent.state != neighbor_agent.state:
+        if (agent.state, neighbor_agent.state) in [(SIRStates.DISAGREE, SIRStates.BELIEVE), (SIRStates.BELIEVE, SIRStates.DISAGREE)]:
+          if bernoulli.rvs(self.params.p_opinion_change):
+            agent.state = SIRStates.UNSURE
+        elif agent.state == SIRStates.UNSURE:
+          if bernoulli.rvs(self.params.p_opinion_change):
+            agent.state = neighbor_agent.state
+
+
+# --- SEIZ ---
+class SEIZStates(enum.IntEnum):
+  DEFAULT = 0
+  SUSCEPTIBLE = 0
+  EXPOSED = 1
+  SKEPTIC = 2
+  INFECTED = 3
+
+
+# TODO: docs
+class SEIZModel(Model):
+  class Params(NamedTuple):
+    initial_infected: float
+    initial_skeptics: float
+    prob_S_with_I: float  # TODO: docs
+    prob_S_with_Z: float  # TODO: docs
+    prob_E_to_I: float  # TODO: docs
+
+  def __init__(self, params: Params):
+    """
+    Implements the SEIZ Model
+    """
+
+    super().__init__()
+
+    self.params = params
+
+  def setup(self):
+    # Initialize initial believers/skeptics
+    n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
+    n_initial_skeptics = math.floor(self.population_size * self.params.initial_skeptics)
+
+    initial_biased: List[BaseAgent] = random.sample(self.schedule.agents, n_initial_believers + n_initial_skeptics)
+
+    for i in range(n_initial_believers):
+      initial_biased[i].state = SEIZStates.INFECTED
+
+    for i in range(n_initial_believers, len(initial_biased)):
+      initial_biased[i].state = SEIZStates.SKEPTIC
+
+  def create_agent(self, unique_id: int, agent_params: BaseAgent.Params):
+    return BaseAgent(unique_id, self, SEIZStates.DEFAULT, agent_params)
+
+  def resolve(self, agent: BaseAgent) -> None:
+    """
+    Resolves interaction between agents
+
+    :param agent: agent that is to update
+    """
+
+    # TODO: explain this
+    neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
+
+    if len(neighbors) == 0:
+      return
+
+    # Normal transitions
+    for neighbor_id in random.sample(neighbors, min(1, len(neighbors))):
+      neighbor = self.schedule.agents[neighbor_id]
+
+      if agent.state == SEIZStates.EXPOSED:
+        if bernoulli.rvs(self.params.prob_E_to_I):
+          agent.state = SEIZStates.INFECTED
+          return
+
+      if (agent.state, neighbor.state) == (SEIZStates.EXPOSED, SEIZStates.INFECTED):
+        if bernoulli.rvs(self.params.prob_S_with_I):
+          agent.state = SEIZStates.INFECTED
+
+      if (agent.state, neighbor.state) == (SEIZStates.SUSCEPTIBLE, SEIZStates.INFECTED):
+        if bernoulli.rvs(self.params.prob_S_with_I):
+          agent.state = SEIZStates.INFECTED
+        else:
+          agent.state = SEIZStates.EXPOSED
+
+      if (agent.state, neighbor.state) == (SEIZStates.SUSCEPTIBLE, SEIZStates.SKEPTIC):
+        if bernoulli.rvs(self.params.prob_S_with_Z):
+          agent.state = SEIZStates.SKEPTIC
+        else:
+          agent.state = SEIZStates.EXPOSED
 
 
 # --- SEIZplus ---
@@ -636,7 +779,6 @@ class SEIZMModel(Model):
           #add reinforcement otherwise 
 
 
-
 class Model:
   
   class ModelType(enum.IntEnum):
@@ -648,6 +790,8 @@ class Model:
   @staticmethod
   def model_by_type(model_type: ModelType) -> 'type(Model)':
     models = defaultdict()
+    models[Model.ModelType.SIR] = SIRModel
+    models[Model.ModelType.SEIZ] = SEIZModel
     models[Model.ModelType.SEIZplus] = SEIZplusModel
     models[Model.ModelType.SEIZM] = SEIZMModel
 
