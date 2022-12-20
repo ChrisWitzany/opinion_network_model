@@ -33,6 +33,11 @@ class BaseAgentState(enum.IntEnum):
 
 
 class BaseAgent(Agent):
+  """
+  Base implementation of an Agent, it only has a single state variable and no specialized parameters
+  It also depicts the interface for specialized agents
+  """
+
   class Params(NamedTuple):
     pass
 
@@ -73,7 +78,6 @@ class MoneyAgent(Agent):
       params.sentiment + math.pow(-1, random.randint(0, 1)) * random.uniform(0, 0.2)
     )
 
-  
   def step(self):
     self.model.resolve(self)
 
@@ -86,24 +90,23 @@ class SIRStates(enum.IntEnum):
   BELIEVE = 2
 
 
-# TODO: docs
 class SIRModel(Model):
+  """
+  Implements the SIR Model
+  """
+
   class Params(NamedTuple):
     initial_infected: float
     initial_disagree: float
     p_opinion_change: float
 
   def __init__(self, params: Params):
-    """
-    Implements the SIR Model
-    """
-
     super().__init__()
 
     self.params = params
 
   def setup(self):
-    # Initialize initial believers/skeptics
+    # Setup initial believers/skeptics
     n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
     n_initial_disagree = math.floor(self.population_size * self.params.initial_disagree)
 
@@ -120,7 +123,7 @@ class SIRModel(Model):
 
   def resolve(self, agent: BaseAgent) -> None:
     """
-    Resolves interaction between agents
+    Resolves interaction between agents.
 
     :param agent: agent that is to update
     """
@@ -148,20 +151,19 @@ class SEIZStates(enum.IntEnum):
   INFECTED = 3
 
 
-# TODO: docs
 class SEIZModel(Model):
+  """
+  Implements the SEIZ Model
+  """
+
   class Params(NamedTuple):
     initial_infected: float
     initial_skeptics: float
-    prob_S_with_I: float  # TODO: docs
-    prob_S_with_Z: float  # TODO: docs
-    prob_E_to_I: float  # TODO: docs
+    prob_S_with_I: float
+    prob_S_with_Z: float
+    prob_E_to_I: float
 
   def __init__(self, params: Params):
-    """
-    Implements the SEIZ Model
-    """
-
     super().__init__()
 
     self.params = params
@@ -189,31 +191,39 @@ class SEIZModel(Model):
     :param agent: agent that is to update
     """
 
-    # TODO: explain this
     neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
 
     if len(neighbors) == 0:
       return
 
     # Normal transitions
+
+    # Select random neighbor
     for neighbor_id in random.sample(neighbors, min(1, len(neighbors))):
       neighbor = self.schedule.agents[neighbor_id]
 
+      # Exposed agents can transition to being infected with some probability
       if agent.state == SEIZStates.EXPOSED:
         if bernoulli.rvs(self.params.prob_E_to_I):
           agent.state = SEIZStates.INFECTED
           return
 
+      # Exposed agents can transition to being infected with some probability
+      # when in contact with infected agent
       if (agent.state, neighbor.state) == (SEIZStates.EXPOSED, SEIZStates.INFECTED):
         if bernoulli.rvs(self.params.prob_S_with_I):
           agent.state = SEIZStates.INFECTED
 
+      # Susceptible agents can transition to being infected with some probability
+      # when in contact with infected agent, otherwise they become exposed
       if (agent.state, neighbor.state) == (SEIZStates.SUSCEPTIBLE, SEIZStates.INFECTED):
         if bernoulli.rvs(self.params.prob_S_with_I):
           agent.state = SEIZStates.INFECTED
         else:
           agent.state = SEIZStates.EXPOSED
 
+      # Susceptible agents can transition to being skeptic with some probability
+      # when in contact with skeptic agent, otherwise they become exposed
       if (agent.state, neighbor.state) == (SEIZStates.SUSCEPTIBLE, SEIZStates.SKEPTIC):
         if bernoulli.rvs(self.params.prob_S_with_Z):
           agent.state = SEIZStates.SKEPTIC
@@ -230,26 +240,25 @@ class SEIZplusStates(enum.IntEnum):
   INFECTED = 3
 
 
-# TODO: docs
 class SEIZplusModel(Model):
+  """
+  Implements the SEIZ+ Model
+  """
+
   class Params(NamedTuple):
     initial_infected: float
     initial_skeptics: float
-    prob_S_with_I: float  # TODO: docs
-    prob_S_with_Z: float  # TODO: docs
-    neighbor_threshold: float = None  # TODO: docs
+    prob_S_with_I: float
+    prob_S_with_Z: float
+    neighbor_threshold: float = None
 
   def __init__(self, params: Params):
-    """
-    Implements the SEIZ+ Model
-    """
-
     super().__init__()
 
     self.params = params
 
   def setup(self):
-    # Initialize initial believers/skeptics
+    # Setup initial believers/skeptics
     n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
     n_initial_skeptics = math.floor(self.population_size * self.params.initial_skeptics)
 
@@ -271,31 +280,34 @@ class SEIZplusModel(Model):
     :param agent: agent that is to update
     """
 
-    # TODO: explain this
     neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
 
     if len(neighbors) == 0:
       return
 
+    # Group pressure effect, an agent might change his state when a certain threshold of neighboring
+    # agents that have a counter-opinion is reached.
     if self.params.neighbor_threshold is not None:
-      if agent.state == SEIZMstates.SKEPTIC:
-        n_infected = 0
-        for neighbor_id in neighbors:
-          neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZMstates.INFECTED:
-            n_infected += 1
+      if agent.state == SEIZplusStates.SKEPTIC:
+        n_infected = sum([
+          1 if self.schedule.agents[neighbor_id].state == SEIZplusStates.INFECTED
+          else 0
+          for neighbor_id in neighbors
+        ])
+
         if n_infected > self.params.neighbor_threshold * len(neighbors):
-          agent.state = SEIZMstates.INFECTED
+          agent.state = SEIZplusStates.INFECTED
           return
 
-      if agent.state == SEIZMstates.INFECTED:
-        n_skeptic = 0
-        for neighbor_id in neighbors:
-          neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZMstates.SKEPTIC:
-            n_skeptic += 1
+      if agent.state == SEIZplusStates.INFECTED:
+        n_skeptic = sum([
+          1 if self.schedule.agents[neighbor_id].state == SEIZplusStates.SKEPTIC
+          else 0
+          for neighbor_id in neighbors
+        ])
+
         if n_skeptic > self.params.neighbor_threshold * len(neighbors):
-          agent.state = SEIZMstates.SKEPTIC
+          agent.state = SEIZplusStates.SKEPTIC
           return
 
     # Normal transitions
@@ -328,8 +340,8 @@ class SEIZplusModel(Model):
         else:
           agent.state = SEIZplusStates.EXPOSED
 
-# --- SEIZM ---
 
+# --- SEIZM ---
 class SEIZMstates(enum.IntEnum):
   DEFAULT = 0
   SUSCEPTIBLE = 0
@@ -338,33 +350,30 @@ class SEIZMstates(enum.IntEnum):
   INFECTED = 3
 
 
-# TODO: docs
 class SEIZMModel(Model):
+  """
+  Implements the SEIZM Model
+  """
+
   class Params(NamedTuple):
-    #Maybe some of these will be useless
     initial_infected: float
     initial_skeptics: float
-    prob_S_with_I: float  # TODO: docs
-    prob_S_with_Z: float  # TODO: docs
+    prob_S_with_I: float
+    prob_S_with_Z: float
     certainty_threshold: float
     influence_threshold: float
-    money_theshold: float
+    money_threshold: float
     influence_increase: float
     certainty_increase: float
-    neighbor_threshold: float = None  # TODO: docs
-
+    neighbor_threshold: float = None
 
   def __init__(self, params: Params):
-    """
-    Implements the SEIZM Model
-    """
-
     super().__init__()
 
     self.params = params
 
   def setup(self):
-    # Initialize initial believers/skeptics
+    # Setup initial believers/skeptics
     n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
     n_initial_skeptics = math.floor(self.population_size * self.params.initial_skeptics)
 
@@ -386,29 +395,32 @@ class SEIZMModel(Model):
     :param agent: agent that is to update
     """
 
-    # TODO: explain this
     neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
 
     if len(neighbors) == 0:
       return
 
+    # Group pressure effect, an agent might change his state when a certain threshold of neighboring
+    # agents that have a counter-opinion is reached.
     if self.params.neighbor_threshold is not None:
       if agent.state == SEIZMstates.SKEPTIC:
-        n_infected = 0
-        for neighbor_id in neighbors:
-          neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZMstates.INFECTED:
-            n_infected += 1
+        n_infected = sum([
+          1 if self.schedule.agents[neighbor_id].state == SEIZMstates.INFECTED
+          else 0
+          for neighbor_id in neighbors
+        ])
+
         if n_infected > self.params.neighbor_threshold * len(neighbors):
           agent.state = SEIZMstates.INFECTED
           return
 
       if agent.state == SEIZMstates.INFECTED:
-        n_skeptic = 0
-        for neighbor_id in neighbors:
-          neighbor = self.schedule.agents[neighbor_id]
-          if neighbor.state == SEIZMstates.SKEPTIC:
-            n_skeptic += 1
+        n_skeptic = sum([
+          1 if self.schedule.agents[neighbor_id].state == SEIZMstates.SKEPTIC
+          else 0
+          for neighbor_id in neighbors
+        ])
+
         if n_skeptic > self.params.neighbor_threshold * len(neighbors):
           agent.state = SEIZMstates.SKEPTIC
           return
@@ -509,7 +521,7 @@ class SEIZMModel(Model):
           money_condition = neighbor.params.money >= 0
           certainty_condition = neighbor.params.certainty > self.params.certainty_threshold
           influence_condition = neighbor.params.influence > self.params.influence_threshold
-          random_condition = random.uniform(0,1) > self.params.money_theshold
+          random_condition = random.uniform(0,1) > self.params.money_threshold
 
           if money_condition and certainty_condition and influence_condition and random_condition:
             #ask to spend money 
@@ -795,7 +807,7 @@ class SEIZMModel(Model):
             else:
 
               #skeptic has higher certainty in his belief + random factor
-              if certainty_condition_agent_wins and random.uniform(0,1) < self.params.money_theshold:
+              if certainty_condition_agent_wins and random.uniform(0,1) < self.params.money_threshold:
                 neighbor.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
@@ -811,7 +823,7 @@ class SEIZMModel(Model):
           money_condition = agent.params.money >= 0
           certainty_condition = agent.params.certainty > self.params.certainty_threshold
           influence_condition = agent.params.influence > self.params.influence_threshold
-          random_condition = random.uniform(0,1) > self.params.money_theshold
+          random_condition = random.uniform(0,1) > self.params.money_threshold
 
           if money_condition and certainty_condition and influence_condition and random_condition:
             #ask to spend money 
@@ -955,7 +967,7 @@ class SEIZMModel(Model):
             else:
 
               #skeptic has higher certainty in his belief + random factor
-              if certainty_condition_neighbor_wins and random.uniform(0,1) < self.params.money_theshold:
+              if certainty_condition_neighbor_wins and random.uniform(0,1) < self.params.money_threshold:
                 agent.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
@@ -967,7 +979,7 @@ class SEIZMModel(Model):
           positive_balance_agent = agent.params.money >= 0
           certainty_condition_agent = agent.params.certainty > self.params.certainty_threshold
           influence_condition_agent = agent.params.influence > self.params.influence_threshold
-          random_param = random.uniform(0,1) > self.params.money_theshold
+          random_param = random.uniform(0,1) > self.params.money_threshold
 
           if positive_balance_agent and certainty_condition_agent and influence_condition_agent and random_param:
             #aqgent asks neighbor to spend money 
@@ -988,7 +1000,7 @@ class SEIZMModel(Model):
           positive_balance = neighbor.params.money >= 0
           certainty_condition = neighbor.params.certainty > self.params.certainty_threshold
           influence_condition = neighbor.params.influence > self.params.influence_threshold
-          random_param = random.uniform(0,1) > self.params.money_theshold
+          random_param = random.uniform(0,1) > self.params.money_threshold
 
           if positive_balance and certainty_condition and influence_condition and random_param:
             #neighbor asks agent to spend money 
@@ -997,7 +1009,7 @@ class SEIZMModel(Model):
               #agree
               agent.params.money -= 1
               neighbor.params.money += 1
-              #increase certainty by a factor of neighbors certainty and influence 
+              #increase certainty by a factor of neighbors certainty and influence
               agent.params.certainty = max(1, agent.params.certainty + self.params.certainty_increase * ((neighbor.params.certainty - self.params.certainty_threshold) + (neighbor.params.influence - self.params.influence_threshold)))
               neighbor.params.influence = max(1, neighbor.params.influence + self.params.influence_increase * (1 - (neighbor.params.influence - agent.params.influence)))
             else:
@@ -1016,6 +1028,12 @@ class Model:
 
   @staticmethod
   def model_by_type(model_type: ModelType) -> 'type(Model)':
+    """
+    Resolves model dynamics by network type
+
+    :param model_type:
+    :return: Model dynamics corresponding to model type
+    """
     models = defaultdict()
     models[Model.ModelType.SIR] = SIRModel
     models[Model.ModelType.SEIZ] = SEIZModel

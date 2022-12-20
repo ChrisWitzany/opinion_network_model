@@ -19,6 +19,7 @@ class DefaultNetwork:
 
     :param n: number of nodes
     :param p: probability of edge creation
+
     :return: random graph
     """
 
@@ -210,31 +211,33 @@ class RelaxedCavemanNetwork(DefaultNetwork):
 
     nx.draw_kamada_kawai(graph)
 
+
 # --- STAR_CLIQUES ---
-class StarClique(DefaultNetwork):
+class StarCliqueNetwork(DefaultNetwork):
   @staticmethod
-  def generate(l: int, n: float, m: float) -> nx.Graph:
+  def generate(l: int, n: int, m: int) -> nx.Graph:
     """
     Generates a graph similar to the Relaxed Caveman Graph as specified in:
     https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.relaxed_caveman_graph.html
 
-    where the cliques are Windmill graphs as specified in: 
+    where instead of cliques, there are Windmill graphs as specified in:
+    https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.windmill_graph.html#networkx.generators.community.windmill_graph
 
-
-    :param l: number of windmill cliques
-    :param n: number of cliques in the windmill subgraphs
-    :param m: size of cliques in the windmill subgraphs 
+    :param l: number of windmill sub-graphs
+    :param n: number of cliques in the windmill sub-graphs
+    :param m: size of cliques in the windmill sub-graphs
 
     :return: Connected Star Clique Graph of l cliques each of size k
     """
-    #size of cliques in the main graph
+
+    # size of cliques in the main graph
     k = n * m + 1
 
     clique_list = []
     for i in range(l):
       clique_list.append(nx.windmill_graph(n, m))
 
-    #now need to connect the cliques of clique_list in a caveman fashion
+    # now need to connect the cliques of clique_list in a caveman fashion
     G = nx.compose_all(clique_list)
 
     caveman_nodes = []
@@ -243,7 +246,7 @@ class StarClique(DefaultNetwork):
       caveman_nodes.append(component.nodes[random.randint(0, k)])
     
     for i in range(len(caveman_nodes)):
-      if i==len(caveman_nodes)-1:
+      if i == len(caveman_nodes)-1:
         G.add_edge(caveman_nodes[i], caveman_nodes[0])
       else:
         G.add_edge(caveman_nodes[i], caveman_nodes[i+1])
@@ -266,14 +269,13 @@ class BarabasiAlbertNetwork(DefaultNetwork):
   @staticmethod
   def generate(n: int, m1: int, m2: int, p: float) -> nx.Graph:
     """
-    Generates Dual Barabasi-Albert Graph as specified in:
+    Generates Dual Barabási-Albert Graph as specified in:
     https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.dual_barabasi_albert_graph.html
 
     :param n: number of nodes
     :param m1: number of edges to link each new node to existing nodes with probability p
     :param m2: number of edges to link each new node to existing nodes with probability 1-p
     :param p: probability of attaching m1 edges (as opposed to m2 edges)
-
 
     :return: Random graph using dual Barabási–Albert preferential attachment
     """
@@ -306,14 +308,20 @@ class NetworkType(enum.IntEnum):
 class Network:
   @staticmethod
   def network_by_type(network_type: NetworkType) -> type(DefaultNetwork):
-    networks = defaultdict(DefaultNetwork)
+    """
+    Resolves graph class by network type
+
+    :param network_type:
+    :return: Graph class corresponding to network type
+    """
+    networks = defaultdict(lambda: DefaultNetwork)
     networks[NetworkType.CAVEMAN] = CavemanNetwork
     networks[NetworkType.GAUSSIAN_RANDOM_PARTITION] = GaussianRandomPartitionNetwork
     networks[NetworkType.WINDMILL] = WindmillNetwork
     networks[NetworkType.SMALLWORLD] = SmallWorldNetwork
     networks[NetworkType.ERDOS_RENYI] = ErdosRenyiNetwork
     networks[NetworkType.RELAXED_CAVEMAN] = RelaxedCavemanNetwork
-    networks[NetworkType.STAR_CLIQUE] = StarClique
+    networks[NetworkType.STAR_CLIQUE] = StarCliqueNetwork
     networks[NetworkType.BARABASI_ALBERT] = BarabasiAlbertNetwork
 
     return networks[network_type]
@@ -334,7 +342,7 @@ class Network:
   @staticmethod
   def visualize(network_type: NetworkType, graph: nx.Graph):
     """
-    Selects best method for visualizing the graph type
+    Picks the best method for visualizing the graph type
 
     :param network_type: type of graph to visualize
     :param graph: input graph
