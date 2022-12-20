@@ -169,7 +169,7 @@ class SEIZModel(Model):
     self.params = params
 
   def setup(self):
-    # Initialize initial believers/skeptics
+    # Setup initial believers/skeptics
     n_initial_believers = math.floor(self.population_size * self.params.initial_infected)
     n_initial_skeptics = math.floor(self.population_size * self.params.initial_skeptics)
 
@@ -312,9 +312,13 @@ class SEIZplusModel(Model):
 
     # Normal transitions
 
+    # Select random neighbor
     for neighbor_id in random.sample(neighbors, min(1, len(neighbors))):
       neighbor = self.schedule.agents[neighbor_id]
 
+      # If agent is exposed they can decide on either skeptic or infected if exclusively
+      # the corresponding random variable is true and they are currently not in contact
+      # with an agent of opposing opinion
       if agent.state == SEIZplusStates.EXPOSED:
         transition_I = bernoulli.rvs(self.params.prob_S_with_I)
         transition_Z = bernoulli.rvs(self.params.prob_S_with_Z)
@@ -328,12 +332,16 @@ class SEIZplusModel(Model):
         if transition_Z and not transition_I and neighbor_not_infected:
           agent.state = SEIZplusStates.SKEPTIC
 
+      # If agent is susceptible and in contact with an infected agent, they also become
+      # infected with some probability, otherwise they become exposed
       if (agent.state, neighbor.state) == (SEIZplusStates.SUSCEPTIBLE, SEIZplusStates.INFECTED):
         if bernoulli.rvs(self.params.prob_S_with_I):
           agent.state = SEIZplusStates.INFECTED
         else:
           agent.state = SEIZplusStates.EXPOSED
 
+      # If agent is susceptible and in contact with a skeptic agent, they also become
+      # skeptic with some probability, otherwise they become exposed
       if (agent.state, neighbor.state) == (SEIZplusStates.SUSCEPTIBLE, SEIZplusStates.SKEPTIC):
         if bernoulli.rvs(self.params.prob_S_with_Z):
           agent.state = SEIZplusStates.SKEPTIC
