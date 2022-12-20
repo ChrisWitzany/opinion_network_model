@@ -22,7 +22,7 @@ ModelType = Model.ModelType
 
 class ModelWrapper:
   """
-  This class defines the network model
+  This is used to wrap model dynamics and network together
   """
 
   def __init__(self,
