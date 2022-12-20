@@ -959,7 +959,7 @@ class SEIZMModel(Model):
                 agent.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
-                agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
+                agent.params.certainty = min(0, agent.params.certainty - self.params.certainty_increase * neighbor.params.influence)
 
         #CASE 4.4 - DONE
         if neighbor.state == SEIZMstates.INFECTED:
