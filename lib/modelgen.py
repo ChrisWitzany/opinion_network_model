@@ -914,7 +914,7 @@ class SEIZMModel(Model):
 
             #increase certainty of neighbor by a factor of agent's influence 
             if step > random.uniform(0,1) * self.params.certainty_threshold:
-              neighbor.params.certainty = max(neighor.params.certainty + random.uniform(0,1) * step, 1)
+              neighbor.params.certainty = max(neighbor.params.certainty + random.uniform(0,1) * step, 1)
 
             #increase influence of agent
             if step > random.uniform(0,1) * self.params.influence_threshold:
