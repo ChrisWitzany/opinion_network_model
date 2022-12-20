@@ -54,6 +54,17 @@ class BaseAgent(Agent):
 
 # --- Money Agent ---
 class MoneyAgent(Agent):
+
+  """
+    Implements the agent instances for the SEIZM model as extension of the BaseAgent wiht more advanced agent parameters
+
+    :param certainty: float between 0 and 1 indicating how certain an agent is about its belief
+    :param influence: float between 0 and 1 indicating how influent an agent is 
+    :param money: money balance of an agent, sign indicated the balance (spent or earned money) and the absolute value indicates nr. of transactions
+    :param sentiment: float between 0 and 1 indicating towards which opinion - Skeptic or Infected - an agent tends
+
+  """
+
   class Params:
     certainty: float
     influence: float
@@ -445,16 +456,8 @@ class SEIZMModel(Model):
       if agent.state == SEIZMstates.EXPOSED:
 
         #CASE 1.1 - neighbor is exposed - DONE
-        if neighbor.state == SEIZMstates.EXPOSED:
-
-          #balance out the sentiments of both agents
-
-          agent_sentiment = agent.params.sentiment
-          neighbor_sentiment = neighbor.params.sentiment
-          balanced_sentiment = agent_sentiment + neighbor_sentiment / 2
-
-          agent.params.sentiment = balanced_sentiment
-          neighbor.params.sentiment = balanced_sentiment
+        if neighbor.state == SEIZMstates.SUSCEPTIBLE:
+          neighbor.state = SEIZMstates.EXPOSED
 
         #CASE 1.2 - neighbor is skeptic
         if neighbor.state == SEIZMstates.SKEPTIC:
@@ -674,6 +677,10 @@ class SEIZMModel(Model):
             #increase influence of neighbor
             if step > random.uniform(0,1) * self.params.influence_threshold:
               neighbor.params.influence = max(1, neighbor.params.influence + random.uniform(0,1) * step)
+        
+        #CASE 2.3 - neighbor is Exposed
+        if neighbor.state == SEIZMstates.EXPOSED:
+          agent.state = SEIZMstates.EXPOSED
 
       #CASE 3 - agent is skeptic
       if agent.state == SEIZMstates.SKEPTIC:
@@ -984,7 +991,7 @@ class SEIZMModel(Model):
               else:
                 agent.params.certainty = min(0, agent.params.certainty - self.params.certainty_increase * neighbor.params.influence)
 
-        #CASE 4.4 - DONE
+        #CASE 4.4 - neighbor is infected 
         if neighbor.state == SEIZMstates.INFECTED:
 
           positive_balance_agent = agent.params.money >= 0
