@@ -499,7 +499,7 @@ class SEIZMModel(Model):
             else:
 
               #small step in random direction
-              agent.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * agent.params.certainty
+              agent.params.sentiment = max(1, agent.params.sentiment + math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * agent.params.certainty)
 
 
 
@@ -595,99 +595,172 @@ class SEIZMModel(Model):
       #CASE 2 - agent is susceptible
       if agent.state == SEIZMstates.SUSCEPTIBLE:
 
-        #CASE 2.1 - DONE - next step make more difficult to reach high levels and low levels of attributes
+        #CASE 2.1 - neighbor is skeptic 
         if neighbor.state == SEIZMstates.SKEPTIC:
 
-          if bernoulli.rvs(self.params.prob_S_with_Z):
-            agent.state = SEIZMstates.SKEPTIC
-            neighbor.params.influence = max(1, self.params.influence_increase * (1 - abs(neighbor.params.influence - 0.5)) + neighbor.params.influence)
-          else:
-            agent.state = SEIZMstates.EXPOSED
-            #initialize all suscptible with a 0.5 sentiment
-            step = neighbor.params.influence * random.uniform(0,1)
-            agent.params.sentiment -= step
-            if step > random.uniform(0,1) * self.params.certainty_threshold:
-              agent.params.certainty += random.uniform(0,1) * step
-            if step > random.uniform(0,1) * self.params.influence_threshold:
-              neighbor.params.influence += random.uniform(0,1) * step
 
-        #CASE 2.2 - DONE
-        if neighbor.state == SEIZMstates.INFECTED:
-          #transition to EXPOSED
-          if bernoulli.rvs(self.params.prob_S_with_I):
-            agent.state = SEIZMstates.INFECTED
-            neighbor.params.influence = max(1, self.params.influence_increase * (1 - abs(neighbor.params.influence - 0.5)) + neighbor.params.influence)
+          #move directly to skeptic without going to exposed 
+          if bernoulli.rvs(self.params.prob_S_with_Z):
+
+            agent.state = SEIZMstates.SKEPTIC
+
+            #increase influence of neighbor
+            neighbor.params.influence = max(1, self.params.influence_increase + neighbor.params.influence)
+          
+          #move to exposed
           else:
+
             agent.state = SEIZMstates.EXPOSED
+
+            #gain sentiment for the skeptics by a factor of the neighbor's influence 
+            step = neighbor.params.influence * random.uniform(0,1)
+            agent.params.sentiment = min(0, agent.params.sentiment - step)
+
+            #increase certainty of agent by a factor of neighbor's influence 
+            if step > random.uniform(0,1) * self.params.certainty_threshold:
+              agent.params.certainty = max(agent.params.certainty + random.uniform(0,1) * step, 1)
+
+            #increase influence of neighbor
+            if step > random.uniform(0,1) * self.params.influence_threshold:
+              neighbor.params.influence = max(1, neighbor.params.influence + random.uniform(0,1) * step)
+
+        #CASE 2.2 - neighbor is infected
+        if neighbor.state == SEIZMstates.INFECTED:
+
+          #directly transition to infected
+          if bernoulli.rvs(self.params.prob_S_with_I):
+
+            agent.state = SEIZMstates.INFECTED
+
+            #increase neighbor influence 
+            neighbor.params.influence = max(1, self.params.influence_increase + neighbor.params.influence)
+
+          #transition to exposed 
+          else:
+
+            agent.state = SEIZMstates.EXPOSED
+
+            #gain sentiment for the infected by a factor of the neighbor's influence 
             step = neighbor.params.influence * random.uniform(0,1)
             agent.params.sentiment += step
+
+            #increase certainty of agent by a factor of neighbor's influence 
             if step > random.uniform(0,1) * self.params.certainty_threshold:
-              agent.params.certainty += random.uniform(0,1) * step
+              agent.params.certainty = max(agent.params.certainty + random.uniform(0,1) * step, 1)
+
+            #increase influence of neighbor
             if step > random.uniform(0,1) * self.params.influence_threshold:
-              neighbor.params.influence += random.uniform(0,1) * step
+              neighbor.params.influence = max(1, neighbor.params.influence + random.uniform(0,1) * step)
 
       #CASE 3 - agent is skeptic
       if agent.state == SEIZMstates.SKEPTIC:
 
-        #CASE 3.1 - DONE
+        #CASE 3.1 - neighbor is exposed
         if neighbor.state == SEIZMstates.EXPOSED:
 
           #Good setiment towards skeptics
           if neighbor.params.sentiment <= 0.5:
+
+            certainty_test = neighbor.params.certainty <= agent.params.certainty
+            influence_test = agent.params.influence > self.params.influence_threshold
             
-            if neighbor.params.certainty <= agent.params.certainty and agent.params.influence > self.params.influence_threshold:
+            #skeptic is sufficiently influent and certain to trigger a transition of the agent to skeptic
+            if certainty_test and influence_test:
+
               #skeptic is more certain and influent enough - move to skeptic
               neighbor.state = SEIZMstates.SKEPTIC
-              neighbor.params.certainty += agent.params.certainty * self.params.certainty_increase
-              agent.params.influence = max(agent.params.influence + self.params.influence_increase * (0.5 - neighbor.params.sentiment), 1)
-              #increase represents how good he was at convinicing him 
+
+              #the more certain the neighbor is, the more certain the agent becomes
+              neighbor.params.certainty = max(1, neighbor.params.certainty + agent.params.certainty * self.params.certainty_increase)
+
+              #increase in influence depends on how good he was at convinicing him - if sentiment was already close to 0 influence goes up less
+              agent.params.influence = max(agent.params.influence + self.params.influence_increase * neighbor.params.sentiment, 1)
+              
+            #exposed is more certain or skeptic not convincing enough - semtiments moves towards skeptic
             else:
-              #exposed is more certain or skeptic not convincing enough - move towards skeptic
-              neighbor.params.sentiment -= random.uniform(0,1) * neighbor.params.certainty
+
+              #move more drastically towards skeptic the more the agent is certain
+              #agent.params.sentiment = min(0, agent.params.sentiment - random.uniform(0,1) * agent.params.certainty)
+              neighbor.params.sentiment = min(0, neighbor.params.sentiment - random.uniform(0,1) * neighbor.params.certainty)
           
+          #bad sentiment towards skeptics
           else:
-            #bad sentiment towards skeptics
 
-            if agent.params.influence > self.params.influence_threshold: #still tries
+            #if skeptic is influent enough, he still tries
+            if agent.params.influence > self.params.influence_threshold:
+
               p = random.uniform(0,1)
-              if (p > self.params.influence_threshold):
-                #suceeds
+
+              #neighbor accepts with random probability - more likely if skeptic is more influent 
+              if (p < agent.params.influence):
+
+                #agent suceeded in convincing 
                 neighbor.state = SEIZMstates.SKEPTIC
-                agent.params.influence += random.uniform(0,1) * (neighbor.params.sentiment) # 1 - for influence 
+
+                #influence increase depends on how certain the agent was in the opposite opinion
+                agent.params.influence = max(1, agent.params.influence + neighbor.params.sentiment)
+                #neighbor.params.influence = max(1, neighbor.params.influence + random.uniform(0,1) * agent.params.sentiment)
+
+              #agent rejects and sees the counterpart as too bold
               else:
-                #fails - sees the counterpart as too bold
-                agent.params.influence -= random.uniform(0,1) * (1 - neighbor.params.sentiment) # not 1 - for inlfuence
-                neighbor.params.sentiment += random.uniform(0,1) * neighbor.params.certainty
-                neighbor.params.certainty += agent.params.influence * random.uniform(0,1)
 
+                #influence decrease depends on how easy it should've been to convince the neighbor (i.e small decrease if close to 1)
+                #agent.params.influence = min(0, neighbor.params.influence - random.uniform(0,1) * (1 - agent.params.sentiment))
+                agent.params.influence = min(0, agent.params.influence - (1 - neighbor.params.sentiment))
+
+                #sentiment is pushed even further in the opposite direction 
+                #neighbor.params.sentiment = max(1, neighbor.params.sentiment + random.uniform(0,1) * neighbor.params.certainty)
+                neighbor.params.sentiment = max(1, neighbor.params.sentiment + neighbor.params.certainty)
+
+
+                #the more influent (bolder) the skeptic was, the more the agent becomes more certain
+                #neighbor.params.certainty = max(1, neighbor.params.certainty + agent.params.influence * random.uniform(0,1))
+                neighbor.params.certainty = max(1, neighbor.params.certainty + agent.params.influence)
+
+            #does not try to interact with neighbor 
             else:
-              #small step in random direction
-              neighbor.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty
 
-        #CASE 3.2 - DONE
+              #small step in random direction
+              neighbor.params.sentiment = max(1, neighbor.params.sentiment + math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty)
+
+
+        #CASE 3.2 - neighbor is susceptible 
         if neighbor.state == SEIZMstates.SUSCEPTIBLE:
 
+          #move directly to skeptic without going to exposed 
           if bernoulli.rvs(self.params.prob_S_with_Z):
+
             neighbor.state = SEIZMstates.SKEPTIC
-            agent.params.influence = max(1, self.params.influence_increase * (1 - abs(agent.params.influence - 0.5)) + agent.params.influence)
+
+            #increase influence of agents
+            agent.params.influence = max(1, self.params.influence_increase + agent.params.influence)
+          
+          #move to exposed
           else:
+
             neighbor.state = SEIZMstates.EXPOSED
-            #initialize all suscptible with a 0.5 sentiment
+
+            #gain sentiment for the skeptics by a factor of the neighbor's influence 
             step = agent.params.influence * random.uniform(0,1)
-            neighbor.params.sentiment -= step
+            neighbor.params.sentiment = min(0, neighbor.params.sentiment - step)
+
+            #increase certainty of agent by a factor of neighbor's influence 
             if step > random.uniform(0,1) * self.params.certainty_threshold:
-              neighbor.params.certainty += random.uniform(0,1) * step
+              neighbor.params.certainty = max(neighbor.params.certainty + random.uniform(0,1) * step, 1)
+
+            #increase influence of neighbor
             if step > random.uniform(0,1) * self.params.influence_threshold:
-              agent.params.influence += random.uniform(0,1) * step
+              agent.params.influence = max(1, agent.params.influence + random.uniform(0,1) * step)
 
-        #CASE 3.3 - DONE
+        #CASE 3.3 - neighbor is skeptic
         if neighbor.state == SEIZMstates.SKEPTIC:
-
+          
+          #both skeptics reinforce their beliefs
           certainty_reinforcement = neighbor.params.certainty + agent.params.certainty + 1 / 3
           neighbor.params.certainty = certainty_reinforcement
           agent.params.certainty = certainty_reinforcement
 
-        #CASE 3.4 - DONE
+        #CASE 3.4 - neighbor is infected
         if neighbor.state == SEIZMstates.INFECTED:
 
           certainty_condition_neighbor_wins = agent.params.certainty <= self.params.certainty_threshold and neighbor.params.certainty >= self.params.certainty_threshold
@@ -695,92 +768,159 @@ class SEIZMModel(Model):
           influence_condition_neighbor_wins = agent.params.influence <= self.params.influence_threshold and neighbor.params.influence >= self.params.influence_threshold
           influence_condition_agent_wins = neighbor.params.influence < self.params.influence_threshold and agent.params.influence > self.params.influence_threshold
 
-          if influence_condition_neighbor_wins: #times a ceratin epsilon (i.e. close to 0)
+          #infected has a stronger influence 
+          if influence_condition_neighbor_wins: 
+
+            #infected has a higher certainty in his belief - skeptic transitions back to exposed 
             if certainty_condition_neighbor_wins:
               agent.state = SEIZMstates.EXPOSED
+            #skeptic has a higher certainty in his belief - decrease certainty since infected has strong influence
             else:
-              agent.params.certainty -= 0.01 * neighbor.params.influence
+              agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
 
-          if influence_condition_agent_wins and neighbor.params.money == 0:
-            if certainty_condition_agent_wins:
-              neighbor.state = SEIZMstates.EXPOSED
+          #skeptic has a stronger influence
+          if influence_condition_agent_wins:
+
+            #infected has no monetary incentive towards his belief
+            if neighbor.params.money == 0:
+
+              #skeptic has higher certainty in his belief - skeptic transitions back to exposed 
+              if certainty_condition_agent_wins:
+                neighbor.state = SEIZMstates.EXPOSED
+              #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
+              else:
+                neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+            
+            #infected has monetary incentive towards his belief
             else:
-              neighbor.params.certainty -= 0.01 * agent.params.influence
+
+              #skeptic has higher certainty in his belief + random factor
+              if certainty_condition_agent_wins and random.uniform(0,1) < self.params.money_theshold:
+                neighbor.state = SEIZMstates.EXPOSED
+              #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
+              else:
+                neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+
 
       #CASE 4 - agent is infected
       if agent.state == SEIZMstates.INFECTED:
 
-        #CASE 4.1 - DONE
+        #CASE 4.1 - neighbor is exposed
         if neighbor.state == SEIZMstates.EXPOSED:
           
-          if agent.params.money >= 0 and agent.params.certainty > self.params.certainty_threshold and agent.params.influence > self.params.influence_threshold and random.uniform(0,1) > self.params.money_theshold:
+          money_condition = agent.params.money >= 0
+          certainty_condition = agent.params.certainty > self.params.certainty_threshold
+          influence_condition = agent.params.influence > self.params.influence_threshold
+          random_condition = random.uniform(0,1) > self.params.money_theshold
+
+          if money_condition and certainty_condition and influence_condition and random_condition:
             #ask to spend money 
 
-            if neighbor.params.sentiment > 0.5 and neighbor.params.influence < self.params.influence_threshold and neighbor.params.certainty > self.params.certainty_threshold:
-              #agree
+            matching_sentiment = neighbor.params.sentiment > 0.5
+            influence_condition = neighbor.params.influence < self.params.influence_threshold
+            certainty_condition = neighbor.params.certainty > self.params.certainty_threshold
+
+            #agrees if has a matching sentiment, a low influence (easily influenced), and a high certainty
+            if matching_sentiment and influence_condition and certainty_condition:
+
               neighbor.params.money -= 1
               agent.params.money += 1
               neighbor.state = SEIZMstates.INFECTED
-              #increase certainty by a factor of neighbors certainty and influence 
-              neighbor.params.certainty += 0.1 * ((agent.params.certainty - self.params.certainty_threshold) + (agent.params.influence - self.params.influence_threshold))
-              agent.params.influence += 0.1 * (1 - neighbor.params.sentiment)
-            else:
-              #disagree
-              agent.params.influence -= 0.1 * min(0, neighbor.params.sentiment - 0.5) #because should have been easier to convince them if they tended towards you 
-              neighbor.params.sentiment -= 0.1 * agent.params.influence
 
+              #increase certainty by a factor of agent's certainty and influence
+              convincing_factor = (agent.params.certainty - self.params.certainty_threshold) + (agent.params.influence - self.params.influence_threshold)
+              neighbor.params.certainty = max(1, neighbor.params.certainty + self.params.certainty_increase * convincing_factor)
+              
+              #rate of influence increase depends on the neighbor's sentiment
+              neighbor.params.influence = max(1, neighbor.params.influence + self.params.influence_increase * (1 - agent.params.sentiment))
+            
+            #disagree to spend money
+            else:
+
+              #decrease the influence of the infected more if neighbor's sentiment was already close to 1
+              #should have been easier to convince them if they tended towards you 
+              agent.params.influence = min(0, agent.params.influence - self.params.influence_increase * min(0, neighbor.params.sentiment - 0.5))
+              
+              #decrease the agent's sentiment towards skeptic since neighbor viewed as too bold
+              neighbor.params.sentiment = min(0, neighbor.params.sentiment - agent.params.influence)
+
+          #do not ask to spend money 
           else:
-            #do not ask to spend money 
-            if neighbor.params.sentiment > 0.5:
-              #good sentiment towards infected
-            
-              if neighbor.params.certainty <= agent.params.certainty and agent.params.influence > self.params.influence_threshold:
-                #infected is more certain and influent enough - move to infected
-                neighbor.state = SEIZMstates.INFECTED
-                neighbor.params.certainty = max(neighbor.params.certainty + agent.params.certainty * self.params.certainty_increase, 1)
-                agent.params.influence = max(agent.params.influence + self.params.influence_increase * abs(0.5 - neighbor.params.sentiment), 1)
-                #increase represents how good he was at convinicing him 
-              else:
-                #exposed is more certain or infected not convincing enough - move towards infected
-                neighbor.params.sentiment += random.uniform(0,1) * neighbor.params.certainty
-            
-            else:
-              #bad sentiment towards skeptics
 
-              if agent.params.influence > self.params.influence_threshold: #still tries
+            #good sentiment towards infected
+            if neighbor.params.sentiment > 0.5:
+            
+              certainty_condition = neighbor.params.certainty <= agent.params.certainty
+              influence_condition = agent.params.influence > self.params.influence_threshold
+              
+              #infected is more certain and influent enough - move to infected
+              if certainty_condition and influence_condition:
+
+                neighbor.state = SEIZMstates.INFECTED
+
+                #increase agent certainty the more the infected is certain
+                neighbor.params.certainty = max(neighbor.params.certainty + agent.params.certainty * self.params.certainty_increase, 1)
+                
+                #increase represents how good he was at convinicing him 
+                agent.params.influence = max(agent.params.influence + self.params.influence_increase * (1 - neighbor.params.sentiment), 1)
+                
+              #exposed is more certain or infected not convincing enough - move towards infected
+              else:
+            
+                neighbor.params.sentiment = max(1, neighbor.params.sentiment + random.uniform(0,1) * neighbor.params.certainty)
+            
+            #bad sentiment towards infected
+            else:
+
+              #if infected is influent enough, he still tries
+              if agent.params.influence > self.params.influence_threshold: 
                 p = random.uniform(0,1)
                 if (p > self.params.influence_threshold):
                   #suceeds
                   neighbor.state = SEIZMstates.INFECTED
-                  agent.params.influence += random.uniform(0,1) * (1 - neighbor.params.sentiment) # 1 - for influence 
+                  agent.params.influence = max(1, agent.params.influence + self.params.influence_increase * (1 - neighbor.params.sentiment))
                 else:
                   #fails - sees the counterpart as too bold
-                  agent.params.influence -= random.uniform(0,1) * (neighbor.params.sentiment) # not 1 - for inlfuence
-                  neighbor.params.sentiment -= random.uniform(0,1) * neighbor.params.certainty
-                  neighbor.params.certainty += agent.params.influence * random.uniform(0,1) #higher increase if neighbor had high influence
+                  agent.params.influence = min(0, agent.params.influence - random.uniform(0,1) * neighbor.params.sentiment)
+                  
+                  neighbor.params.sentiment = min(0, neighbor.params.sentiment - random.uniform(0,1) * neighbor.params.certainty)
+
+                  #higher increase if agent had high influence
+                  neighbor.params.certainty = max(1, neighbor.params.certainty + agent.params.influence * random.uniform(0,1))
 
               else:
                 #small step in random direction
-                neighbor.params.sentiment += math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty
+                neighbor.params.sentiment = max(1, neighbor.params.sentiment + math.pow(-1, random.randint(0,1)) * random.uniform(0,1) * neighbor.params.certainty)
 
-
-
-        #CASE 4.2 - DONE
+        #CASE 4.2 - neighbor is susceptible
         if neighbor.state == SEIZMstates.SUSCEPTIBLE:
 
+          #directly transition to infected
           if bernoulli.rvs(self.params.prob_S_with_I):
+
             neighbor.state = SEIZMstates.INFECTED
-            agent.params.influence = max(1, self.params.influence_increase * (1 - abs(agent.params.influence - 0.5)) + agent.params.influence)
+
+            #increase agent influence 
+            agent.params.influence = max(1, self.params.influence_increase + agent.params.influence)
+
+          #transition to exposed 
           else:
+
             neighbor.state = SEIZMstates.EXPOSED
+
+            #gain sentiment for the infected by a factor of the agent's influence 
             step = agent.params.influence * random.uniform(0,1)
             neighbor.params.sentiment += step
-            if step > random.uniform(0,1) * self.params.certainty_threshold:
-              neighbor.params.certainty += random.uniform(0,1) * step
-            if step > random.uniform(0,1) * self.params.influence_threshold:
-              agent.params.influence += random.uniform(0,1) * step
 
-        #CASE 4.3 - DONE
+            #increase certainty of neighbor by a factor of agent's influence 
+            if step > random.uniform(0,1) * self.params.certainty_threshold:
+              neighbor.params.certainty = max(neighor.params.certainty + random.uniform(0,1) * step, 1)
+
+            #increase influence of agent
+            if step > random.uniform(0,1) * self.params.influence_threshold:
+              agent.params.influence = max(1, agent.params.influence + random.uniform(0,1) * step)
+
+        #CASE 4.3 - neighbor is skeptic
         if neighbor.state == SEIZMstates.SKEPTIC:
 
           certainty_condition_neighbor_wins = agent.params.certainty <= self.params.certainty_threshold and neighbor.params.certainty >= self.params.certainty_threshold
@@ -788,17 +928,38 @@ class SEIZMModel(Model):
           influence_condition_neighbor_wins = agent.params.influence <= self.params.influence_threshold and neighbor.params.influence >= self.params.influence_threshold
           influence_condition_agent_wins = neighbor.params.influence < self.params.influence_threshold and agent.params.influence > self.params.influence_threshold
 
-          if influence_condition_neighbor_wins and agent.params.money == 0: #times a ceratin epsilon (i.e. close to 0)
-            if certainty_condition_neighbor_wins:
-              agent.state = SEIZMstates.EXPOSED
-            else:
-              agent.params.certainty -= 0.01 * neighbor.params.influence
+          #infected has a stronger influence -----
+          if influence_condition_agent_wins: 
 
-          if influence_condition_agent_wins:
+            #infected has a higher certainty in his belief - skeptic transitions back to exposed 
             if certainty_condition_agent_wins:
               neighbor.state = SEIZMstates.EXPOSED
+            #skeptic has a higher certainty in his belief - decrease certainty since infected has strong influence
             else:
-              neighbor.params.certainty -= 0.01 * agent.params.influence
+              neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+
+          #skeptic has a stronger influence
+          if influence_condition_neighbor_wins:
+
+            #infected has no monetary incentive towards his belief
+            if agent.params.money == 0:
+
+              #skeptic has higher certainty in his belief - skeptic transitions back to exposed 
+              if certainty_condition_neighbor_wins:
+                agent.state = SEIZMstates.EXPOSED
+              #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
+              else:
+                agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
+            
+            #infected has monetary incentive towards his belief
+            else:
+
+              #skeptic has higher certainty in his belief + random factor
+              if certainty_condition_neighbor_wins and random.uniform(0,1) < self.params.money_theshold:
+                agent.state = SEIZMstates.EXPOSED
+              #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
+              else:
+                agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
 
         #CASE 4.4 - DONE
         if neighbor.state == SEIZMstates.INFECTED:
@@ -815,13 +976,14 @@ class SEIZMModel(Model):
               #agree
               neighbor.params.money -= 1
               agent.params.money += 1
-              #increase certainty by a factor of neighbors certainty and influence 
-              neighbor.params.certainty += 0.1 * ((agent.params.certainty - self.params.certainty_threshold) + (agent.params.influence - self.params.influence_threshold))
-              agent.params.influence += 0.1 * (1 - (agent.params.influence - neighbor.params.influence))
+              #increase certainty by a factor of neighbor's certainty and influence 
+              neighbor.params.certainty = max(1, neighbor.params.certainty + self.params.certainty_increase * ((agent.params.certainty - self.params.certainty_threshold) + (agent.params.influence - self.params.influence_threshold)))
+              agent.params.influence = max(1, agent.params.influence + self.params.influence_increase * (1 - (agent.params.influence - neighbor.params.influence)))
             else:
               #disagree
-              agent.params.influence -= 0.1 * (min(self.params.influence_threshold - neighbor.params.influence, 0)) #because should have been easier to convince them if they tended towards you 
-              neighbor.params.influence += 0.1 * agent.params.influence
+              #decrease influence by a factor of neighbor's influence because should have been easier to convince them if they tended towards you 
+              agent.params.influence = min(0, agent.params.influence - self.params.influence_increase * (min(self.params.influence_threshold - neighbor.params.influence, 0)))
+              neighbor.params.influence = max(1, neighbor.params.influence + self.params.influence_increase * agent.params.influence)
 
           positive_balance = neighbor.params.money >= 0
           certainty_condition = neighbor.params.certainty > self.params.certainty_threshold
@@ -836,14 +998,12 @@ class SEIZMModel(Model):
               agent.params.money -= 1
               neighbor.params.money += 1
               #increase certainty by a factor of neighbors certainty and influence 
-              agent.params.certainty += 0.1 * ((neighbor.params.certainty - self.params.certainty_threshold) + (neighbor.params.influence - self.params.influence_threshold))
-              neighbor.params.influence += 0.1 * (1 - (neighbor.params.influence - agent.params.influence))
+              agent.params.certainty = max(1, agent.params.certainty + self.params.certainty_increase * ((neighbor.params.certainty - self.params.certainty_threshold) + (neighbor.params.influence - self.params.influence_threshold)))
+              neighbor.params.influence = max(1, neighbor.params.influence + self.params.influence_increase * (1 - (neighbor.params.influence - agent.params.influence)))
             else:
               #disagree
-              neighbor.params.influence -= 0.1 * (min(self.params.influence_threshold - agent.params.influence, 0)) #because should have been easier to convince them if they tended towards you 
-              agent.params.influence += 0.1 * neighbor.params.influence
-
-          #add reinforcement otherwise 
+              neighbor.params.influence = min(0, neighbor.params.influence - self.params.influence_increase * (min(self.params.influence_threshold - agent.params.influence, 0)))
+              agent.params.influence = max(1, agent.params.influence + self.params.influence_increase * neighbor.params.influence)
 
 
 class Model:
