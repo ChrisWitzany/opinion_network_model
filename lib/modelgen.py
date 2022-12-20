@@ -130,13 +130,16 @@ class SIRModel(Model):
 
     neighbors = self.grid.get_neighbors(agent.unique_id, include_center=False)
 
+    # Go over all neighbors
     for neighbor_id in neighbors:
       neighbor_agent = self.schedule.agents[neighbor_id]
 
       if agent.state != neighbor_agent.state:
+        # If neighbor has different opinion, the agent becomes unsure with some probability
         if (agent.state, neighbor_agent.state) in [(SIRStates.DISAGREE, SIRStates.BELIEVE), (SIRStates.BELIEVE, SIRStates.DISAGREE)]:
           if bernoulli.rvs(self.params.p_opinion_change):
             agent.state = SIRStates.UNSURE
+        # If unsure, the agent adapts the neighbors' opinion with some probability
         elif agent.state == SIRStates.UNSURE:
           if bernoulli.rvs(self.params.p_opinion_change):
             agent.state = neighbor_agent.state
