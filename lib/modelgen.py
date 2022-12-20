@@ -776,7 +776,7 @@ class SEIZMModel(Model):
               agent.state = SEIZMstates.EXPOSED
             #skeptic has a higher certainty in his belief - decrease certainty since infected has strong influence
             else:
-              agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
+              agent.params.certainty = min(0, agent.params.certainty - self.params.certainty_increase * neighbor.params.influence)
 
           #skeptic has a stronger influence
           if influence_condition_agent_wins:
@@ -789,7 +789,7 @@ class SEIZMModel(Model):
                 neighbor.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
-                neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+                neighbor.params.certainty = min(0, neighbor.params.certainty - self.params.certainty_increase * agent.params.influence)
             
             #infected has monetary incentive towards his belief
             else:
@@ -799,7 +799,7 @@ class SEIZMModel(Model):
                 neighbor.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
-                neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+                neighbor.params.certainty = min(0, neighbor.params.certainty - self.params.certainty_increase * agent.params.influence)
 
 
       #CASE 4 - agent is infected
@@ -936,7 +936,7 @@ class SEIZMModel(Model):
               neighbor.state = SEIZMstates.EXPOSED
             #skeptic has a higher certainty in his belief - decrease certainty since infected has strong influence
             else:
-              neighbor.params.certainty = min(0, neighbor.params.cerainty - self.params.certainty_increase * agent.params.influence)
+              neighbor.params.certainty = min(0, neighbor.params.certainty - self.params.certainty_increase * agent.params.influence)
 
           #skeptic has a stronger influence
           if influence_condition_neighbor_wins:
@@ -949,7 +949,7 @@ class SEIZMModel(Model):
                 agent.state = SEIZMstates.EXPOSED
               #infected has a higher certainty in his belief - decrease certainty since infected has strong influence
               else:
-                agent.params.certainty = min(0, agent.params.cerainty - self.params.certainty_increase * neighbor.params.influence)
+                agent.params.certainty = min(0, agent.params.certainty - self.params.certainty_increase * neighbor.params.influence)
             
             #infected has monetary incentive towards his belief
             else:
